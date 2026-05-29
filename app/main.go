@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -17,12 +18,16 @@ func main() {
 			fmt.Fprintln(os.Stderr, "Error reading input:", err)
 			os.Exit(1)
 		}
-		command := scanner.Text()
-		switch command {
+		raw := scanner.Text()
+		args := strings.Split(raw, " ")
+
+		switch args[0] {
 		case "exit":
 			os.Exit(0)
+		case "echo":
+			fmt.Println(strings.Join(args[1:], " "))
 		default:
-			fmt.Printf("%s: command not found\n", command)
+			fmt.Printf("%s: command not found\n", args[0])
 		}
 	}
 }
