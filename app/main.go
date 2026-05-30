@@ -34,17 +34,6 @@ func echoCmd(args []string) int {
 	return 0
 }
 
-func findExecutable(name string) (string, error) {
-	path, err := exec.LookPath(name)
-	if errors.Is(err, exec.ErrDot) {
-		err = nil
-	}
-	if err != nil {
-		return "", err
-	}
-	return path, nil
-}
-
 func typeCmd(args []string) int {
 	if len(args) > 1 {
 		if isBuiltin(args[1]) {
