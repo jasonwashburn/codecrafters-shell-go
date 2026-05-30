@@ -9,48 +9,54 @@ import (
 	"strings"
 )
 
-type validCommand func([]string) int
+type BuiltinFunc func([]string) int
 
-type commandRegistry map[string]validCommand
+type Builtins map[string]BuiltinFunc
 
-func (c commandRegistry) register(name string, cmd validCommand) {
-	c[name] = cmd
+func (b Builtins) register(name string, builtin BuiltinFunc) {
+	b[name] = builtin
 }
 
-var validCommands = make(commandRegistry)
+var builtins = make(Builtins)
 
-func isValidCommand(s string) bool {
-	_, exists := validCommands[s]
+func isBuiltin(s string) bool {
+	_, exists := builtins[s]
 	return exists
 }
 
-func main() {
-	validCommands.register("exit", func(_ []string) int {
-		os.Exit(0)
-		return 0
-	})
-	validCommands.register("echo", func(args []string) int {
-		fmt.Println(strings.Join(args[1:], " "))
-		return 0
-	})
-	validCommands.register("type", func(args []string) int {
-		if len(args) > 1 {
-			if isValidCommand(args[1]) {
-				fmt.Printf("%s is a shell builtin\n", args[1])
-				return 0
-			}
-			path, err := exec.LookPath(args[1])
-			if err == nil || errors.Is(err, exec.ErrDot) {
-				fmt.Printf("%s is %s\n", args[1], path)
-				return 0
-			}
-			fmt.Printf("%s: not found\n", args[1])
-			return 1
-		} else {
-			fmt.Printf(": not found\n")
-			return 1
+func exitCmd(args []string) int {
+	os.Exit(0)
+	return 0
+}
+
+func echoCmd(args []string) int {
+	fmt.Println(strings.Join(args[1:], " "))
+	return 0
+}
+
+func typeCmd(args []string) int {
+	if len(args) > 1 {
+		if isBuiltin(args[1]) {
+			fmt.Printf("%s is a shell builtin\n", args[1])
+			return 0
 		}
-	})
+		path, err := exec.LookPath(args[1])
+		if err == nil || errors.Is(err, exec.ErrDot) {
+			fmt.Printf("%s is %s\n", args[1], path)
+			return 0
+		}
+		fmt.Printf("%s: not found\n", args[1])
+		return 1
+	} else {
+		fmt.Printf(": not found\n")
+		return 1
+	}
+}
+
+func main() {
+	builtins.register("exit", exitCmd)
+	builtins.register("echo", echoCmd)
+	builtins.register("type", typeCmd)
 	scanner := bufio.NewScanner(os.Stdin)
 	for {
 		fmt.Print("$ ")
@@ -64,9 +70,9 @@ func main() {
 		raw := scanner.Text()
 		args := strings.Split(raw, " ")
 
-		switch isValidCommand(args[0]) {
+		switch isBuiltin(args[0]) {
 		case true:
-			validCommands[args[0]](args)
+			builtins[args[0]](args)
 		default:
 			fmt.Printf("%s: command not found\n", args[0])
 		}
