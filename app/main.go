@@ -34,14 +34,25 @@ func echoCmd(args []string) int {
 	return 0
 }
 
+func findExecutable(name string) (string, error) {
+	path, err := exec.LookPath(name)
+	if errors.Is(err, exec.ErrDot) {
+		err = nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
 func typeCmd(args []string) int {
 	if len(args) > 1 {
 		if isBuiltin(args[1]) {
 			fmt.Printf("%s is a shell builtin\n", args[1])
 			return 0
 		}
-		path, err := exec.LookPath(args[1])
-		if err == nil || errors.Is(err, exec.ErrDot) {
+		path, err := findExecutable(args[1])
+		if err == nil {
 			fmt.Printf("%s is %s\n", args[1], path)
 			return 0
 		}
@@ -70,10 +81,17 @@ func main() {
 		raw := scanner.Text()
 		args := strings.Split(raw, " ")
 
-		switch isBuiltin(args[0]) {
-		case true:
+		if isBuiltin(args[0]) {
 			builtins[args[0]](args)
-		default:
+			continue
+		}
+		path, err := findExecutable(args[0])
+		if err == nil {
+			cmd := exec.Command(path, args[1:]...)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			_ = cmd.Run()
+		} else {
 			fmt.Printf("%s: command not found\n", args[0])
 		}
 	}
