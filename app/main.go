@@ -2,8 +2,10 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 )
 
@@ -36,10 +38,14 @@ func main() {
 			if isValidCommand(args[1]) {
 				fmt.Printf("%s is a shell builtin\n", args[1])
 				return 0
-			} else {
-				fmt.Printf("%s: not found\n", args[1])
-				return 1
 			}
+			path, err := exec.LookPath(args[1])
+			if err == nil || errors.Is(err, exec.ErrDot) {
+				fmt.Printf("%s is %s\n", args[1], path)
+				return 0
+			}
+			fmt.Printf("%s: not found\n", args[1])
+			return 1
 		} else {
 			fmt.Printf(": not found\n")
 			return 1
