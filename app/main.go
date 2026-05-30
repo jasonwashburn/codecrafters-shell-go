@@ -85,9 +85,8 @@ func main() {
 			builtins[args[0]](args)
 			continue
 		}
-		path, err := findExecutable(args[0])
-		if err == nil {
-			cmd := exec.Command(path, args[1:]...)
+		if _, err := exec.LookPath(args[0]); err == nil {
+			cmd := exec.Command(args[0], args[1:]...)
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
 			_ = cmd.Run()
