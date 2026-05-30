@@ -3,13 +3,12 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"strings"
 )
 
-type BuiltinFunc func(*Config, []string) int
+type BuiltinFunc func([]string) int
 
 type Builtins map[string]BuiltinFunc
 
@@ -17,44 +16,38 @@ func (b Builtins) register(name string, builtin BuiltinFunc) {
 	b[name] = builtin
 }
 
-type Config struct {
-	Pwd string
-}
-
-func newConfig() (*Config, error) {
-	pwd, err := os.Getwd()
+func cdCmd(args []string) int {
+	err := os.Chdir(args[1])
 	if err != nil {
-		return nil, err
+		fmt.Printf("unable to change directory to %s: %v", args[1], err)
+		return 1
 	}
-	cfg := &Config{
-		Pwd: pwd,
-	}
-	return cfg, nil
-}
-
-func isBuiltin(s string) bool {
-	_, exists := builtins[s]
-	return exists
-}
-
-func exitCmd(_ *Config, _ []string) int {
-	os.Exit(0)
 	return 0
 }
 
-func echoCmd(_ *Config, args []string) int {
+func echoCmd(args []string) int {
 	fmt.Println(strings.Join(args[1:], " "))
 	return 0
 }
 
-func pwdCmd(cfg *Config, _ []string) int {
-	fmt.Println(cfg.Pwd)
+func exitCmd(_ []string) int {
+	os.Exit(0)
 	return 0
 }
 
-func typeCmd(_ *Config, args []string) int {
+func pwdCmd(_ []string) int {
+	pwd, err := os.Getwd()
+	if err != nil {
+		fmt.Printf("unable to get working directory: %v\n", err)
+		return 1
+	}
+	fmt.Println(pwd)
+	return 0
+}
+
+func typeCmd(args []string) int {
 	if len(args) > 1 {
-		if isBuiltin(args[1]) {
+		if _, exists := builtins[args[1]]; exists {
 			fmt.Printf("%s is a shell builtin\n", args[1])
 			return 0
 		}
@@ -73,10 +66,7 @@ func typeCmd(_ *Config, args []string) int {
 var builtins = make(Builtins)
 
 func main() {
-	cfg, err := newConfig()
-	if err != nil {
-		log.Fatal("unable to initialize config: ", err)
-	}
+	builtins.register("cd", cdCmd)
 	builtins.register("echo", echoCmd)
 	builtins.register("exit", exitCmd)
 	builtins.register("pwd", pwdCmd)
@@ -94,8 +84,8 @@ func main() {
 		raw := scanner.Text()
 		args := strings.Split(raw, " ")
 
-		if isBuiltin(args[0]) {
-			builtins[args[0]](cfg, args)
+		if _, exists := builtins[args[0]]; exists {
+			builtins[args[0]](args)
 			continue
 		}
 		if _, err := exec.LookPath(args[0]); err == nil {
