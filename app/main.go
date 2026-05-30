@@ -17,9 +17,13 @@ func (b Builtins) register(name string, builtin BuiltinFunc) {
 }
 
 func cdCmd(args []string) int {
-	err := os.Chdir(args[1])
+	path := args[1]
+	if path == "~" {
+		path = os.Getenv("HOME")
+	}
+	err := os.Chdir(path)
 	if err != nil {
-		fmt.Printf("cd: %s: No such file or directory\n", args[1])
+		fmt.Printf("cd: %s: No such file or directory\n", path)
 		return 1
 	}
 	return 0
