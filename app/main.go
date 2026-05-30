@@ -19,7 +19,7 @@ func (b Builtins) register(name string, builtin BuiltinFunc) {
 func cdCmd(args []string) int {
 	err := os.Chdir(args[1])
 	if err != nil {
-		fmt.Printf("unable to change directory to %s: %v", args[1], err)
+		fmt.Printf("cd: %s: No such file or directory\n", args[1])
 		return 1
 	}
 	return 0
