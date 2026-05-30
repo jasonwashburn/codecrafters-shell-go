@@ -51,8 +51,7 @@ func typeCmd(args []string) int {
 			fmt.Printf("%s is a shell builtin\n", args[1])
 			return 0
 		}
-		path, err := findExecutable(args[1])
-		if err == nil {
+		if path, err := exec.LookPath(args[1]); err == nil {
 			fmt.Printf("%s is %s\n", args[1], path)
 			return 0
 		}
