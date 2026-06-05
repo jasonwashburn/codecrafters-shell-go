@@ -67,6 +67,39 @@ func typeCmd(args []string) int {
 	}
 }
 
+func splitArgs(input string) ([]string, error) {
+	inSingle := false
+	var current strings.Builder
+	var args []string
+	for _, r := range input {
+		switch {
+		case inSingle:
+			if r == '\'' {
+				inSingle = false
+			} else {
+				current.WriteRune(r)
+			}
+		case r == '\'':
+			inSingle = true
+		case r == ' ' || r == '\t':
+			if current.Len() > 0 {
+				args = append(args, current.String())
+				current.Reset()
+			}
+		default:
+			current.WriteRune(r)
+		}
+	}
+
+	if inSingle {
+		return nil, fmt.Errorf("unterminated single quote")
+	}
+	if current.Len() > 0 {
+		args = append(args, current.String())
+	}
+	return args, nil
+}
+
 var builtins = make(Builtins)
 
 func main() {
@@ -86,7 +119,11 @@ func main() {
 			os.Exit(1)
 		}
 		raw := scanner.Text()
-		args := strings.Split(raw, " ")
+		args, err := splitArgs(raw)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			continue
+		}
 
 		if _, exists := builtins[args[0]]; exists {
 			builtins[args[0]](args)
