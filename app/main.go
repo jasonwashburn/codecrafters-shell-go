@@ -69,6 +69,7 @@ func typeCmd(args []string) int {
 
 func splitArgs(input string) ([]string, error) {
 	inSingle := false
+	inDouble := false
 	var current strings.Builder
 	var args []string
 	for _, r := range input {
@@ -79,8 +80,16 @@ func splitArgs(input string) ([]string, error) {
 			} else {
 				current.WriteRune(r)
 			}
+		case inDouble:
+			if r == '"' {
+				inDouble = false
+			} else {
+				current.WriteRune(r)
+			}
 		case r == '\'':
 			inSingle = true
+		case r == '"':
+			inDouble = true
 		case r == ' ' || r == '\t':
 			if current.Len() > 0 {
 				args = append(args, current.String())
