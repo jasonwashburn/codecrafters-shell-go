@@ -12,20 +12,54 @@ import (
 type BuiltinFunc func(CmdEnv, []string) int
 
 type CmdEnv struct {
-	Stdout io.Writer
-	Stderr io.Writer
+	Stdout  io.Writer
+	Stderr  io.Writer
+	Closers []io.Closer
 }
 
-func (c CmdEnv) Outf(format string, a ...any) {
+func newCmdEnv() CmdEnv {
+	return CmdEnv{
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+	}
+}
+
+func (c *CmdEnv) Close() {
+	for _, closer := range c.Closers {
+		_ = closer.Close()
+	}
+}
+
+func (c *CmdEnv) Outf(format string, a ...any) {
 	_, _ = fmt.Fprintf(c.Stdout, format, a...)
 }
 
-func (c CmdEnv) Outln(a ...any) {
+func (c *CmdEnv) Outln(a ...any) {
 	_, _ = fmt.Fprintln(c.Stdout, a...)
 }
 
-func (c CmdEnv) Errf(format string, a ...any) {
+func (c *CmdEnv) Errf(format string, a ...any) {
 	_, _ = fmt.Fprintf(c.Stdout, format, a...)
+}
+
+func (c *CmdEnv) redirectStdout(filename string) error {
+	file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0o643)
+	if err != nil {
+		return fmt.Errorf("error opening file %s: %v", filename, err)
+	}
+	c.Closers = append(c.Closers, file)
+	c.Stdout = file
+	return nil
+}
+
+func (c *CmdEnv) redirectStderr(filename string) error {
+	file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0o643)
+	if err != nil {
+		return fmt.Errorf("error opening file %s: %v", filename, err)
+	}
+	c.Closers = append(c.Closers, file)
+	c.Stderr = file
+	return nil
 }
 
 type Builtins map[string]BuiltinFunc
@@ -144,29 +178,24 @@ func splitArgs(input string) ([]string, error) {
 }
 
 func executeCommand(args []string) error {
-	env := CmdEnv{
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
-	}
+	env := newCmdEnv()
+	defer env.Close()
+
 	if len(args) >= 3 && strings.Contains(args[len(args)-2], ">") {
 		switch args[len(args)-2] {
 		case "2>":
 			filename := args[len(args)-1]
-			file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0o643)
+			err := env.redirectStderr(filename)
 			if err != nil {
-				return fmt.Errorf("error opening file %s: %v", filename, err)
+				return err
 			}
-			defer file.Close()
-			env.Stderr = file
 			args = args[:len(args)-2] // consume the redirect and target
 		default:
 			filename := args[len(args)-1]
-			file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0o643)
+			err := env.redirectStdout(filename)
 			if err != nil {
-				return fmt.Errorf("error opening file %s: %v", filename, err)
+				return err
 			}
-			defer file.Close()
-			env.Stdout = file
 			args = args[:len(args)-2] // consume the redirect and target
 		}
 	}
