@@ -42,8 +42,28 @@ func (c *cmdEnv) errf(format string, a ...any) {
 	_, _ = fmt.Fprintf(c.Stdout, format, a...)
 }
 
+func (c *cmdEnv) appendStdout(filename string) error {
+	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return fmt.Errorf("error opening file %s: %v", filename, err)
+	}
+	c.Closers = append(c.Closers, file)
+	c.Stdout = file
+	return nil
+}
+
+func (c *cmdEnv) appendStderr(filename string) error {
+	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return fmt.Errorf("error opening file %s: %v", filename, err)
+	}
+	c.Closers = append(c.Closers, file)
+	c.Stderr = file
+	return nil
+}
+
 func (c *cmdEnv) redirectStdout(filename string) error {
-	file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0o643)
+	file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0o644)
 	if err != nil {
 		return fmt.Errorf("error opening file %s: %v", filename, err)
 	}
@@ -53,7 +73,7 @@ func (c *cmdEnv) redirectStdout(filename string) error {
 }
 
 func (c *cmdEnv) redirectStderr(filename string) error {
-	file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0o643)
+	file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0o644)
 	if err != nil {
 		return fmt.Errorf("error opening file %s: %v", filename, err)
 	}
@@ -182,22 +202,30 @@ func executeCommand(args []string) error {
 	defer env.close()
 
 	if len(args) >= 3 && strings.Contains(args[len(args)-2], ">") {
+		filename := args[len(args)-1]
 		switch args[len(args)-2] {
+		case "2>>":
+			err := env.appendStderr(filename)
+			if err != nil {
+				return err
+			}
+		case "1>>", ">>":
+			err := env.appendStdout(filename)
+			if err != nil {
+				return err
+			}
 		case "2>":
-			filename := args[len(args)-1]
 			err := env.redirectStderr(filename)
 			if err != nil {
 				return err
 			}
-			args = args[:len(args)-2] // consume the redirect and target
 		default:
-			filename := args[len(args)-1]
 			err := env.redirectStdout(filename)
 			if err != nil {
 				return err
 			}
-			args = args[:len(args)-2] // consume the redirect and target
 		}
+		args = args[:len(args)-2] // consume the redirect and target
 	}
 
 	if builtin, exists := builtins[args[0]]; exists {
