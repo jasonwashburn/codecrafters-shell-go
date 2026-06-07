@@ -72,19 +72,20 @@ func splitArgs(input string) ([]string, error) {
 	inDouble := false
 	var current strings.Builder
 	var args []string
-	for _, r := range input {
+	for i := 0; i < len(input); i++ {
+		r := input[i]
 		switch {
 		case inSingle:
 			if r == '\'' {
 				inSingle = false
 			} else {
-				current.WriteRune(r)
+				current.WriteByte(r)
 			}
 		case inDouble:
 			if r == '"' {
 				inDouble = false
 			} else {
-				current.WriteRune(r)
+				current.WriteByte(r)
 			}
 		case r == '\'':
 			inSingle = true
@@ -95,8 +96,14 @@ func splitArgs(input string) ([]string, error) {
 				args = append(args, current.String())
 				current.Reset()
 			}
+		case r == '\\':
+			if !inSingle && !inDouble {
+				next := input[i+1]
+				i++
+				current.WriteByte(next)
+			}
 		default:
-			current.WriteRune(r)
+			current.WriteByte(r)
 		}
 	}
 
