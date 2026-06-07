@@ -82,9 +82,18 @@ func splitArgs(input string) ([]string, error) {
 				current.WriteByte(r)
 			}
 		case inDouble:
-			if r == '"' {
+			switch r {
+			case '"':
 				inDouble = false
-			} else {
+			case '\\':
+				next := input[i+1]
+				if next == '\\' || next == '"' {
+					i++
+					current.WriteByte(next)
+				} else {
+					current.WriteByte(next)
+				}
+			default:
 				current.WriteByte(r)
 			}
 		case r == '\'':
