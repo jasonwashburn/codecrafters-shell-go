@@ -9,40 +9,40 @@ import (
 	"strings"
 )
 
-type BuiltinFunc func(CmdEnv, []string) int
+type builtinFunc func(cmdEnv, []string) int
 
-type CmdEnv struct {
+type cmdEnv struct {
 	Stdout  io.Writer
 	Stderr  io.Writer
 	Closers []io.Closer
 }
 
-func newCmdEnv() CmdEnv {
-	return CmdEnv{
+func newCmdEnv() cmdEnv {
+	return cmdEnv{
 		Stdout: os.Stdout,
 		Stderr: os.Stderr,
 	}
 }
 
-func (c *CmdEnv) Close() {
+func (c *cmdEnv) close() {
 	for _, closer := range c.Closers {
 		_ = closer.Close()
 	}
 }
 
-func (c *CmdEnv) Outf(format string, a ...any) {
+func (c *cmdEnv) outf(format string, a ...any) {
 	_, _ = fmt.Fprintf(c.Stdout, format, a...)
 }
 
-func (c *CmdEnv) Outln(a ...any) {
+func (c *cmdEnv) outln(a ...any) {
 	_, _ = fmt.Fprintln(c.Stdout, a...)
 }
 
-func (c *CmdEnv) Errf(format string, a ...any) {
+func (c *cmdEnv) errf(format string, a ...any) {
 	_, _ = fmt.Fprintf(c.Stdout, format, a...)
 }
 
-func (c *CmdEnv) redirectStdout(filename string) error {
+func (c *cmdEnv) redirectStdout(filename string) error {
 	file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0o643)
 	if err != nil {
 		return fmt.Errorf("error opening file %s: %v", filename, err)
@@ -52,7 +52,7 @@ func (c *CmdEnv) redirectStdout(filename string) error {
 	return nil
 }
 
-func (c *CmdEnv) redirectStderr(filename string) error {
+func (c *cmdEnv) redirectStderr(filename string) error {
 	file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0o643)
 	if err != nil {
 		return fmt.Errorf("error opening file %s: %v", filename, err)
@@ -62,59 +62,59 @@ func (c *CmdEnv) redirectStderr(filename string) error {
 	return nil
 }
 
-type Builtins map[string]BuiltinFunc
+type builtinFuncs map[string]builtinFunc
 
-func (b Builtins) register(name string, builtin BuiltinFunc) {
+func (b builtinFuncs) register(name string, builtin builtinFunc) {
 	b[name] = builtin
 }
 
-func cdCmd(env CmdEnv, args []string) int {
+func cdCmd(env cmdEnv, args []string) int {
 	path := args[1]
 	if path == "~" {
 		path = os.Getenv("HOME")
 	}
 	err := os.Chdir(path)
 	if err != nil {
-		env.Errf("cd: %s: No such file or directory\n", path)
+		env.errf("cd: %s: No such file or directory\n", path)
 		return 1
 	}
 	return 0
 }
 
-func echoCmd(env CmdEnv, args []string) int {
-	env.Outln(strings.Join(args[1:], " "))
+func echoCmd(env cmdEnv, args []string) int {
+	env.outln(strings.Join(args[1:], " "))
 	return 0
 }
 
-func exitCmd(_ CmdEnv, _ []string) int {
+func exitCmd(_ cmdEnv, _ []string) int {
 	os.Exit(0)
 	return 0
 }
 
-func pwdCmd(env CmdEnv, _ []string) int {
+func pwdCmd(env cmdEnv, _ []string) int {
 	pwd, err := os.Getwd()
 	if err != nil {
-		env.Errf("unable to get working directory: %v\n", err)
+		env.errf("unable to get working directory: %v\n", err)
 		return 1
 	}
-	env.Outln(pwd)
+	env.outln(pwd)
 	return 0
 }
 
-func typeCmd(env CmdEnv, args []string) int {
+func typeCmd(env cmdEnv, args []string) int {
 	if len(args) > 1 {
 		if _, exists := builtins[args[1]]; exists {
-			env.Outf("%s is a shell builtin\n", args[1])
+			env.outf("%s is a shell builtin\n", args[1])
 			return 0
 		}
 		if path, err := exec.LookPath(args[1]); err == nil {
-			env.Outf("%s is %s\n", args[1], path)
+			env.outf("%s is %s\n", args[1], path)
 			return 0
 		}
-		env.Errf("%s: not found\n", args[1])
+		env.errf("%s: not found\n", args[1])
 		return 1
 	} else {
-		env.Errf(": not found\n")
+		env.errf(": not found\n")
 		return 1
 	}
 }
@@ -179,7 +179,7 @@ func splitArgs(input string) ([]string, error) {
 
 func executeCommand(args []string) error {
 	env := newCmdEnv()
-	defer env.Close()
+	defer env.close()
 
 	if len(args) >= 3 && strings.Contains(args[len(args)-2], ">") {
 		switch args[len(args)-2] {
@@ -214,7 +214,7 @@ func executeCommand(args []string) error {
 	}
 }
 
-var builtins = make(Builtins)
+var builtins = make(builtinFuncs)
 
 func main() {
 	builtins.register("cd", cdCmd)
