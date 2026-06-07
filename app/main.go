@@ -149,14 +149,26 @@ func executeCommand(args []string) error {
 		Stderr: os.Stderr,
 	}
 	if len(args) >= 3 && strings.Contains(args[len(args)-2], ">") {
-		filename := args[len(args)-1]
-		file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0o643)
-		if err != nil {
-			return fmt.Errorf("error opening file %s: %v", filename, err)
+		switch args[len(args)-2] {
+		case "2>":
+			filename := args[len(args)-1]
+			file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0o643)
+			if err != nil {
+				return fmt.Errorf("error opening file %s: %v", filename, err)
+			}
+			defer file.Close()
+			env.Stderr = file
+			args = args[:len(args)-2] // consume the redirect and target
+		default:
+			filename := args[len(args)-1]
+			file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0o643)
+			if err != nil {
+				return fmt.Errorf("error opening file %s: %v", filename, err)
+			}
+			defer file.Close()
+			env.Stdout = file
+			args = args[:len(args)-2] // consume the redirect and target
 		}
-		defer file.Close()
-		env.Stdout = file
-		args = args[:len(args)-2] // consume the redirect and target
 	}
 
 	if builtin, exists := builtins[args[0]]; exists {
