@@ -1,12 +1,13 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/chzyer/readline"
 )
 
 type builtinFunc func(cmdEnv, []string) int
@@ -250,18 +251,40 @@ func main() {
 	builtins.register("exit", exitCmd)
 	builtins.register("pwd", pwdCmd)
 	builtins.register("type", typeCmd)
-	scanner := bufio.NewScanner(os.Stdin)
+
+	completerItems := []readline.PrefixCompleterInterface{}
+	for b := range builtins {
+		completerItems = append(completerItems, readline.PcItem(b))
+	}
+
+	completer := readline.NewPrefixCompleter(completerItems...)
+
+	l, err := readline.NewEx(&readline.Config{
+		AutoComplete: completer,
+		Prompt:       "$ ",
+	})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "error initializing readline: %w", err)
+	}
+	defer l.Close()
+
 	for {
-		fmt.Print("$ ")
-		if !scanner.Scan() {
+		line, err := l.Readline()
+		if err == readline.ErrInterrupt {
+			if len(line) == 0 {
+				break
+			} else {
+				continue
+			}
+		} else if err == io.EOF {
 			break
 		}
-		if err := scanner.Err(); err != nil {
-			fmt.Fprintln(os.Stderr, "Error reading input:", err)
-			os.Exit(1)
+		line = strings.TrimSpace(line)
+
+		if len(line) == 0 {
+			continue
 		}
-		raw := scanner.Text()
-		args, err := splitArgs(raw)
+		args, err := splitArgs(line)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			continue
