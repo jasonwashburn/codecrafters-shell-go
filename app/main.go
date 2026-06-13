@@ -243,6 +243,18 @@ func executeCommand(args []string) error {
 	}
 }
 
+type bellCompleter struct {
+	readline.AutoCompleter
+}
+
+func (b bellCompleter) Do(line []rune, pos int) ([][]rune, int) {
+	candidates, length := b.AutoCompleter.Do(line, pos)
+	if len(candidates) == 0 {
+		os.Stderr.WriteString("\a")
+	}
+	return candidates, length
+}
+
 var builtins = make(builtinFuncs)
 
 func main() {
@@ -260,7 +272,7 @@ func main() {
 	completer := readline.NewPrefixCompleter(completerItems...)
 
 	l, err := readline.NewEx(&readline.Config{
-		AutoComplete: completer,
+		AutoComplete: bellCompleter{completer},
 		Prompt:       "$ ",
 	})
 	if err != nil {
