@@ -288,12 +288,6 @@ func main() {
 	for b := range builtins {
 		completerItems = append(completerItems, readline.PcItem(b))
 	}
-	executables := listExecutables()
-	debugExecutables := []string{}
-	for d := range executables {
-		debugExecutables = append(debugExecutables, d)
-	}
-	fmt.Println(debugExecutables)
 
 	for e := range listExecutables() {
 		completerItems = append(completerItems, readline.PcItem(e))
