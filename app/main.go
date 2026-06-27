@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/chzyer/readline"
@@ -255,6 +256,25 @@ func (b bellCompleter) Do(line []rune, pos int) ([][]rune, int) {
 	return candidates, length
 }
 
+func listExecutables() map[string]struct{} {
+	executables := make(map[string]struct{})
+
+	pathDirs := filepath.SplitList(os.Getenv("PATH"))
+	for _, dir := range pathDirs {
+		files, _ := os.ReadDir(dir)
+		for _, file := range files {
+			fileInfo, err := file.Info()
+			if err != nil {
+				continue
+			}
+			if fileInfo.Mode()&0o111 != 0 {
+				executables[file.Name()] = struct{}{}
+			}
+		}
+	}
+	return executables
+}
+
 var builtins = make(builtinFuncs)
 
 func main() {
@@ -267,6 +287,16 @@ func main() {
 	completerItems := []readline.PrefixCompleterInterface{}
 	for b := range builtins {
 		completerItems = append(completerItems, readline.PcItem(b))
+	}
+	executables := listExecutables()
+	debugExecutables := []string{}
+	for d := range executables {
+		debugExecutables = append(debugExecutables, d)
+	}
+	fmt.Println(debugExecutables)
+
+	for e := range listExecutables() {
+		completerItems = append(completerItems, readline.PcItem(e))
 	}
 
 	completer := readline.NewPrefixCompleter(completerItems...)
