@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/chzyer/readline"
@@ -244,16 +245,54 @@ func executeCommand(args []string) error {
 	}
 }
 
-type bellCompleter struct {
+type statefulCompleter struct {
 	readline.AutoCompleter
+	lastLine    string
+	tabCount    int
+	refreshHook func()
 }
 
-func (b bellCompleter) Do(line []rune, pos int) ([][]rune, int) {
-	candidates, length := b.AutoCompleter.Do(line, pos)
+func (c *statefulCompleter) Do(line []rune, pos int) ([][]rune, int) {
+	candidates, length := c.AutoCompleter.Do(line, pos)
 	if len(candidates) == 0 {
+		c.tabCount = 0
+		c.lastLine = ""
 		os.Stderr.WriteString("\a")
+		return nil, 0
 	}
-	return candidates, length
+
+	if len(candidates) == 1 {
+		c.tabCount = 0
+		c.lastLine = ""
+		return candidates, length
+	}
+
+	currentLine := string(line[:pos])
+	if currentLine == string(c.lastLine) {
+		c.tabCount++
+	} else {
+		c.lastLine = currentLine
+		c.tabCount = 1
+	}
+
+	if len(candidates) > 1 && c.tabCount == 1 {
+		os.Stderr.WriteString("\a")
+		return nil, 0
+	}
+
+	if len(candidates) > 1 && c.tabCount >= 2 {
+		completions := []string{}
+		for _, c := range candidates {
+			completions = append(completions, string(line[:pos])+string(c))
+		}
+		os.Stderr.WriteString("\n" + strings.Join(completions, " ") + "\n")
+		c.tabCount = 0
+		c.lastLine = ""
+		c.refreshHook()
+		return nil, 0
+	}
+
+	return nil, 0
 }
 
 func listExecutables() map[string]struct{} {
@@ -284,25 +323,39 @@ func main() {
 	builtins.register("pwd", pwdCmd)
 	builtins.register("type", typeCmd)
 
-	completerItems := []readline.PrefixCompleterInterface{}
+	uniqueCompletionTargets := make(map[string]struct{})
 	for b := range builtins {
-		completerItems = append(completerItems, readline.PcItem(b))
+		uniqueCompletionTargets[b] = struct{}{}
 	}
 
 	for e := range listExecutables() {
-		completerItems = append(completerItems, readline.PcItem(e))
+		uniqueCompletionTargets[e] = struct{}{}
+	}
+
+	completionTargets := []string{}
+	for s := range uniqueCompletionTargets {
+		completionTargets = append(completionTargets, s)
+	}
+
+	slices.Sort(completionTargets)
+
+	completerItems := []readline.PrefixCompleterInterface{}
+	for _, i := range completionTargets {
+		completerItems = append(completerItems, readline.PcItem(i))
 	}
 
 	completer := readline.NewPrefixCompleter(completerItems...)
+	myCompleter := &statefulCompleter{completer, "", 0, nil}
 
 	l, err := readline.NewEx(&readline.Config{
-		AutoComplete: bellCompleter{completer},
+		AutoComplete: myCompleter,
 		Prompt:       "$ ",
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "error initializing readline: %w", err)
 	}
 	defer l.Close()
+	myCompleter.refreshHook = l.Refresh
 
 	for {
 		line, err := l.Readline()
